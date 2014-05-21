@@ -66,13 +66,13 @@ INIT
 	MOVE	%B 0101, R1					; ulazni, prekid, maskirajuci,  
 	STORE 	R1, (GPI0_SENSOR_CFG)
 	MOVE 	%B 01111, R1				; ispit bitova, prekida, nemask. prekid, OR
-	OR 		R1, 00FF0000, R1			; bitovi razine na visoko
-	OR 		R1, 00001F00, R1			; maska koji se ispituju, 5 bitni button
-	STORE 	R1, (GPI0_BUTTON_CFG)		; registar
+	OR 	R1, 00FF0000, R1			; bitovi razine na visoko
+	OR 	R1, 00001F00, R1			; maska koji se ispituju, 5 bitni button
+	STORE 	R1, (GPI0_BUTTON_CFG)			; registar
 
 MAIN
 	LOAD 	R2, (BROJAC)
-	OR 		R2, R2, R2
+	OR 	R2, R2, R2
 	JR_NZ 	MAIN
 
 PROVJERA_SIFRE
