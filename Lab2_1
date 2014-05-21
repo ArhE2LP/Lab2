@@ -1,0 +1,133 @@
+GPIO_SENSOR_CFG	  `EQU	0FFFFC000		; ulazna vanjska jedinica
+GPIO_SENSOR_DATA	`EQU	0FFFFE004		; za prvi i drugi 
+GPIO_SENSOR_IACK	`EQU	0FFFFC008		; senzor za auto
+GPIO_SENSOR_END	  `EQU	0FFFFC00C		; (gpio snapwire input)
+
+GPIO_BUTTON_CFG	  `EQU	0FFFFE000		; gpio snapwire button
+GPIO_BUTTON_DATA	`EQU	0FFFFE004		;
+GPIO_BUTTON_IACK	`EQU	0FFFFE008		;
+GPIO_BUTTON_END	  `EQU	0FFFFE00C		;
+
+GPIO_RAMPA_CFG	  `EQU	0FFFFC100		; izlazna vanjska jedinica 
+GPIO_RAMPA_DATA	  `EQU	0FFFFC104		; GPIO snapwire output za 
+GPIO_RAMPA_IACK 	`EQU	0FFFFC108		; pokretanje koracnog
+GPIO_RAMPA_END	  `EQU	0FFFFC10C		; motora 90 stupnjeva
+
+CT1_CONST			`EQU	0FFFF0100
+CT1_CR	      `EQU	0FFFF0104
+CT1_IACK	    `EQU	0FFFF0108
+CT1_IEND			`EQU	0FFFF010C
+
+CT2_CONST			`EQU	0FFFF0200
+CT2_CR				`EQU	0FFFF0204
+CT2_IACK			`EQU	0FFFF0208
+CT2_IEND			`EQU	0FFFF020C
+
+	`ORG		0
+		MOVE	1000, SP	; inicijalizacija stoga
+		JP		INIT	  	; skok na glavni zbog prekidnog vektora
+		
+	`ORG		8			; vektor
+		DW		1000	; adresa prekidnog potprograma (sensor i rampa), 								                                                                               p rovjeriti koji int uzrokuje prekid 
+
+	`ORG		0C 			; nemaskirajuci prekid (button)
+
+	PUSH R0							; spremanje konteksta
+	MOVE SR, R0
+	PUSH R0
+	PUSH R1
+	PUSH R2
+	
+	STORE R0, (GPIO_BUTTON_IACK)	; dojava prekida
+	LOAD R0, (BROJAC)				; load brojaca za zastitu 
+	LOADB R1, (GPIO_BUTTON_DATA) 	; load korisnikov gumb
+
+PROVJERA_SREDNJE....
+	
+
+SHIFT_REGISTER
+	ROTL R1, 8, R1
+	STORE R1, (SIFRA_USER)
+	OR R0, R0, R0
+	JR_Z PROVJERI_SIFRU
+	
+	ADD R1, 1, R1
+	STORE R1, (BROJAC)	
+	...			
+
+	STORE R0, (GPIO_BUTTON_END)
+	POP R2
+	POP R1
+	POP R0
+	MOVE R0, SR
+	POP R0
+
+INIT
+	MOVE	%B 0101, R1					; ulazni, prekid, maskirajuci,  
+	STORE 	R1, (GPI0_SENSOR_CFG)
+	MOVE 	%B 01111, R1				; ispit bitova, prekida, nemask. prekid, OR
+	OR 		R1, 00FF0000, R1			; bitovi razine na visoko
+	OR 		R1, 00001F00, R1			; maska koji se ispituju, 5 bitni button
+	STORE 	R1, (GPI0_BUTTON_CFG)		; registar
+
+MAIN
+	LOAD 	R2, (BROJAC)
+	OR 		R2, R2, R2
+	JR_NZ 	MAIN
+
+PROVJERA_SIFRE
+	LOAD R0, (SIFRA_USER)
+	LOAD R1, (SIFRA_CORRECT) 
+	CMP R0, R1
+	JR_EQ CHECK_SESOR
+
+VRATI 
+	MOVE 5, R0
+	STORE RO, (BROJAC)
+	JR MAIN
+
+CHECK_SENSOR1
+	MOVE 	%B 001, R0
+	STORE 	R0, (GPIO_SENSOR_CFG)
+	LOAD 	R0, (GPIO_SENSOR_DATA)
+	AND 	R0, 1, R0	
+    JR_Z 	VRATI
+
+RAMP_UP	
+	; pokreni motor
+
+WAIT_10s
+	; pokreni CT na INT0
+
+CHECK_SENSOR2
+	1 JR WAIT_10s
+
+RAMP_DOWN
+	JR 	VRATI
+; provjeriti sintaksu prekida
+`ORG 1000  							; adresa prekidnog potprograma
+									; maskirajuci prekid za CT
+	PUSH R0							; spremanje konteksta
+	MOVE SR, R0
+	PUSH R0
+	PUSH R1
+	
+	
+
+
+
+CLOSE
+	; zakreni motor
+	JP L1 ; skoci tamo da resetira stanje sifre, i zapocinje novu provjeru
+
+`ORG 2000  	; mjesto u memoriji gdje je ispravna sifra za otvaranje s kojom 
+		    ; provjeravamo ispravnost unosa korisnika
+	
+	SIFRA_CORRECT	DW 	10080201 
+					; left, up, down, right
+	SIFRA_USER		DW 0
+
+	BROJAC 	DW 	5
+
+
+
