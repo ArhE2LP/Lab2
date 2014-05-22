@@ -1,27 +1,27 @@
 GPIO_SENSOR_CFG	  `EQU	0FFFFC000		; ulazna vanjska jedinica
-GPIO_SENSOR_DATA	`EQU	0FFFFE004		; za prvi i drugi 
-GPIO_SENSOR_IACK	`EQU	0FFFFC008		; senzor za auto
+GPIO_SENSOR_DATA  `EQU	0FFFFE004		; za prvi i drugi 
+GPIO_SENSOR_IACK  `EQU	0FFFFC008		; senzor za auto
 GPIO_SENSOR_END	  `EQU	0FFFFC00C		; (gpio snapwire input)
 
 GPIO_BUTTON_CFG	  `EQU	0FFFFE000		; gpio snapwire button
-GPIO_BUTTON_DATA	`EQU	0FFFFE004		;
-GPIO_BUTTON_IACK	`EQU	0FFFFE008		;
-GPIO_BUTTON_END	  `EQU	0FFFFE00C		;
+GPIO_BUTTON_DATA  `EQU	0FFFFE004	
+GPIO_BUTTON_IACK  `EQU	0FFFFE008	
+GPIO_BUTTON_END	  `EQU	0FFFFE00C		
 
 GPIO_RAMPA_CFG	  `EQU	0FFFFC100		; izlazna vanjska jedinica 
 GPIO_RAMPA_DATA	  `EQU	0FFFFC104		; GPIO snapwire output za 
-GPIO_RAMPA_IACK 	`EQU	0FFFFC108		; pokretanje koracnog
+GPIO_RAMPA_IACK   `EQU	0FFFFC108		; pokretanje koracnog
 GPIO_RAMPA_END	  `EQU	0FFFFC10C		; motora 90 stupnjeva
 
-CT1_CONST			`EQU	0FFFF0100
-CT1_CR	      `EQU	0FFFF0104
-CT1_IACK	    `EQU	0FFFF0108
-CT1_IEND			`EQU	0FFFF010C
+CT1_CONST	`EQU	0FFFF0100
+CT1_CR		`EQU	0FFFF0104
+CT1_IACK	`EQU	0FFFF0108
+CT1_IEND	`EQU	0FFFF010C
 
-CT2_CONST			`EQU	0FFFF0200
-CT2_CR				`EQU	0FFFF0204
-CT2_IACK			`EQU	0FFFF0208
-CT2_IEND			`EQU	0FFFF020C
+CT2_CONST	`EQU	0FFFF0200
+CT2_CR		`EQU	0FFFF0204
+CT2_IACK	`EQU	0FFFF0208
+CT2_IEND	`EQU	0FFFF020C
 
 	`ORG		0
 		MOVE	1000, SP	; inicijalizacija stoga
@@ -63,7 +63,7 @@ SHIFT_REGISTER
 	POP R0
 
 INIT
-	MOVE	%B 0101, R1					; ulazni, prekid, maskirajuci,  
+	MOVE	%B 0101, R1				; ulazni, prekid, maskirajuci,  
 	STORE 	R1, (GPI0_SENSOR_CFG)
 	MOVE 	%B 01111, R1				; ispit bitova, prekida, nemask. prekid, OR
 	OR 	R1, 00FF0000, R1			; bitovi razine na visoko
@@ -74,6 +74,13 @@ MAIN
 	LOAD 	R2, (BROJAC)
 	OR 	R2, R2, R2
 	JR_NZ 	MAIN
+	
+	LOAD 	R2, (ZASTAVICA)
+	OR 	R2, R2, R2
+	JR_NZ	PROVJERA_SIFRE
+	MOVE 	0, R2
+	STORE	R2, (ZASTAVICA)
+	JR	MAIN
 
 PROVJERA_SIFRE
 	LOAD R0, (SIFRA_USER)
@@ -104,17 +111,30 @@ CHECK_SENSOR2
 
 RAMP_DOWN
 	JR 	VRATI
-; provjeriti sintaksu prekida
-`ORG 1000  							; adresa prekidnog potprograma
-									; maskirajuci prekid za CT
+
+`ORG 1000  						
+
 	PUSH R0							; spremanje konteksta
 	MOVE SR, R0
 	PUSH R0
 	PUSH R1
 	
-	
+INT_CAUSE
+	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (prednost)
+	OR	R1, R1, R1		
+	JR_NZ	BUTTON
+	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (sensor)
+	OR	R1, R1, R1		
+	JR_NZ	SENSOR
+	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (ramp)
+	OR	R1, R1, R1		
+	JR_NZ	RAMP
 
+BUTTON
 
+SENSOR
+
+RAMP
 
 CLOSE
 	; zakreni motor
@@ -124,10 +144,10 @@ CLOSE
 		    ; provjeravamo ispravnost unosa korisnika
 	
 	SIFRA_CORRECT	DW 	10080201 
-					; left, up, down, right
-	SIFRA_USER		DW 0
-
-	BROJAC 	DW 	5
+			; left, up, down, right
+	SIFRA_USER	DW 	0
+	BROJA		DW 	0
+	ZASTAVICA    	DW    	0
 
 
 
