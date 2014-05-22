@@ -38,24 +38,7 @@ CT2_IEND	`EQU	0FFFF020C
 	PUSH R1
 	PUSH R2
 	
-	STORE R0, (GPIO_BUTTON_IACK)	; dojava prekida
-	LOAD R0, (BROJAC)				; load brojaca za zastitu 
-	LOADB R1, (GPIO_BUTTON_DATA) 	; load korisnikov gumb
 
-PROVJERA_SREDNJE....
-	
-
-SHIFT_REGISTER
-	ROTL R1, 8, R1
-	STORE R1, (SIFRA_USER)
-	OR R0, R0, R0
-	JR_Z PROVJERI_SIFRU
-	
-	ADD R1, 1, R1
-	STORE R1, (BROJAC)	
-	...			
-
-	STORE R0, (GPIO_BUTTON_END)
 	POP R2
 	POP R1
 	POP R0
@@ -114,27 +97,51 @@ RAMP_DOWN
 
 `ORG 1000  						
 
-	PUSH R0							; spremanje konteksta
+	PUSH R0			 	; spremanje konteksta
 	MOVE SR, R0
 	PUSH R0
 	PUSH R1
 	
 INT_CAUSE
-	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (prednost)
+	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (prednost)
 	OR	R1, R1, R1		
-	JR_NZ	BUTTON
-	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (sensor)
+	JR_NZ	INT_BUTTON
+	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (sensor)
 	OR	R1, R1, R1		
-	JR_NZ	SENSOR
-	AND 	SR, 00000010, R1	; ispitivanje jeli button uzrokovao prekid (ramp)
+	JR_NZ	INT_SENSOR
+	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (ramp)
 	OR	R1, R1, R1		
-	JR_NZ	RAMP
+	JR_NZ	INT_RAMP
 
-BUTTON
+INT_BUTTON
+	STORE 	R0, (GPIO_BUTTON_IACK)	; dojava prekida
+	LOADB 	R1, (GPIO_BUTTON_DATA) 	; load korisnikov gumb
+	AND 	R1, 000000FF, R1	; bitan samo zadnji bajt
 
-SENSOR
+PROVJERA_SREDNJE
+	CMP	R1, 00000004		; 04 je 1 za CENTER	
+	JR_NEQ	PROVJERA_BROJAC
+	MOVE 	1, R2
+	STORE 	R2, (ZASTAVICA)
+	
+PROVJERA_BROJAC	
+	LOAD 	R0, (BROJAC)		; load brojaca za zastitu 
+	
+SHIFT_REGISTER
+	ROTL R1, 8, R1
+	STORE R1, (SIFRA_USER)
+	OR R0, R0, R0
+	JR_Z PROVJERI_SIFRU
+	
+	ADD R1, 1, R1
+	STORE R1, (BROJAC)	
+	...			
 
-RAMP
+	STORE R0, (GPIO_BUTTON_END)
+
+INT_SENSOR
+
+INT_RAMP
 
 CLOSE
 	; zakreni motor
