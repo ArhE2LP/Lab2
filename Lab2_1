@@ -1,18 +1,16 @@
-GPIO_SENSOR_CFG	  `EQU	0FFFFC000		; ulazna vanjska jedinica
-GPIO_SENSOR_DATA  `EQU	0FFFFE004		; za prvi i drugi 
-GPIO_SENSOR_IACK  `EQU	0FFFFC008		; senzor za auto
-GPIO_SENSOR_END	  `EQU	0FFFFC00C		; (gpio snapwire input)
+GPIO_SENSOR_1       `EQU	0FFFFC000   ; GPIO SNAPWIRE LOW INPUT
+GPIO_SENSOR_2       `EQU    0FFFFC004
 
-GPIO_BUTTON_CFG	  `EQU	0FFFFE000		; gpio snapwire button
-GPIO_BUTTON_DATA  `EQU	0FFFFE004	
-GPIO_BUTTON_IACK  `EQU	0FFFFE008	
-GPIO_BUTTON_END	  `EQU	0FFFFE00C		
+GPIO_BUTTON_CFG     `EQU	0FFFFE000   ; GPIO BUTTON ADRESA
+GPIO_BUTTON_DATA    `EQU	0FFFFE004
+GPIO_BUTTON_IACK    `EQU	0FFFFE008
+GPIO_BUTTON_END     `EQU	0FFFFE00C
 
-GPIO_RAMPA_CFG	  `EQU	0FFFFC100		; izlazna vanjska jedinica 
-GPIO_RAMPA_DATA	  `EQU	0FFFFC104		; GPIO snapwire output za 
-GPIO_RAMPA_IACK   `EQU	0FFFFC108		; pokretanje koracnog
-GPIO_RAMPA_END	  `EQU	0FFFFC10C		; motora 90 stupnjeva
-
+GPIO_RAMPA_1        `EQU    0FFFFC100   ; GPIO SNAPWIRE HIGH OUTPUT
+GPIO_RAMPA_2        `EQU    0FFFFC104
+GPIO_RAMPA_3        `EQU    0FFFFC108
+GPIO_RAMPA_4        `EQU    0FFFFC10C
+/*
 CT1_CONST	`EQU	0FFFF0100
 CT1_CR		`EQU	0FFFF0104
 CT1_IACK	`EQU	0FFFF0108
@@ -22,139 +20,127 @@ CT2_CONST	`EQU	0FFFF0200
 CT2_CR		`EQU	0FFFF0204
 CT2_IACK	`EQU	0FFFF0208
 CT2_IEND	`EQU	0FFFF020C
-
+*/
 	`ORG		0
-		MOVE	1000, SP	; inicijalizacija stoga
-		JP		INIT	  	; skok na glavni zbog prekidnog vektora
-		
-	`ORG		8			; vektor
-		DW		1000	; adresa prekidnog potprograma (sensor i rampa), 								                                                                               p rovjeriti koji int uzrokuje prekid 
+    MOVE	    1000, SP                        ; inicijalizacija stoga
+    JP	        INIT	      	                ; skok na glavni zbog prekidnog vektora
 
-	`ORG		0C 			; nemaskirajuci prekid (button)
+	`ORG		8		                        ; vektor
+	DW          PREKIDNI                        ; adresa prekidnog potprograma (tipka je stisnuta)								                                                                               p rovjeriti koji int uzrokuje prekid
 
-	PUSH R0							; spremanje konteksta
-	MOVE SR, R0
-	PUSH R0
-	PUSH R1
-	PUSH R2
-	
 
-	POP R2
-	POP R1
-	POP R0
-	MOVE R0, SR
-	POP R0
 
 INIT
-	MOVE	%B 0101, R1				; ulazni, prekid, maskirajuci,  
-	STORE 	R1, (GPI0_SENSOR_CFG)
-	MOVE 	%B 01111, R1				; ispit bitova, prekida, nemask. prekid, OR
-	OR 	R1, 00FF0000, R1			; bitovi razine na visoko
-	OR 	R1, 00001F00, R1			; maska koji se ispituju, 5 bitni button
-	STORE 	R1, (GPI0_BUTTON_CFG)			; registar
+    MOVE        0, R0
+    STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
+    STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
+    STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
+    MOVE        %B 1100, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
+    MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
+
 
 MAIN
-	LOAD 	R2, (BROJAC)
-	OR 	R2, R2, R2
-	JR_NZ 	MAIN
-	
-	LOAD 	R2, (ZASTAVICA)
-	OR 	R2, R2, R2
-	JR_NZ	PROVJERA_SIFRE
-	MOVE 	0, R2
-	STORE	R2, (ZASTAVICA)
-	JR	MAIN
+	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
+	CMP         R2, 5
+	JR_NEQ      MAIN
 
+	; sifra je unesena, zabrani daljnje prekide i idemo provjeriti sifru jel ispravna !
+
+	MOVE        0, SR                           ; zabrana svih daljnjih prekida
+
+	CALL        PROVJERA_SIFRE
+
+	LOAD        R0, (SIFRA)                     ; ako sifra nije ispravna, resetiraj sve
+	CMP         R0, 0
+	JR_EQ       INIT
+
+	; unesena je ispravna sifra, idemo provjeriti jel automobil ispred !
+
+	LOAD        R0, (GPIO_SENSOR_1)
+	CMP         R0, 0                           ; senzor nije pronasao automobil, resetiraj sve
+	JR_EQ       INIT
+
+	; unesena je ispravna sifra i automobil je ispred, dizi rampu !
+
+	CALL        RAMP_UP
+
+	; rampa je podignuta, provjeri stanje senzora2
+CEKAJ
+	LOAD        R0, (GPIO_SENSOR_2)
+	CMP         R0, 0                           ; rampa jos uvijek treba stojati gore
+	CALL_EQ     WAIT                            ; idemo pricekati 10 sekundi
+	JR          CEKAJ                           ; sad opet idemo provjeriti dal mozemo spustiti ili cemo opet morati pricekat
+
+	; senzor2 je aktiviran, treba spustiti rampu
+
+	CALL        RAMP_DOWN
+
+	; rampa je spustena, ciklus je gotov
+
+	JR          INIT                            ; ili treba zavrsiti (HALT) ?
+
+	;;;;;; KRAJ GLAVNOG PROGRAMA ;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+WAIT
+    RET
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 PROVJERA_SIFRE
-	LOAD R0, (SIFRA_USER)
-	LOAD R1, (SIFRA_CORRECT) 
-	CMP R0, R1
-	JR_EQ CHECK_SESOR
+        PUSH        R0
+        PUSH        R1
 
-VRATI 
-	MOVE 5, R0
-	STORE RO, (BROJAC)
-	JR MAIN
+        LOAD        R0, (UNESENA_SIFRA)
+        LOAD        R1, (ISPRAVNA_SIFRA)
+        CMP         R0, R1
+        JR_NEQ      IZADJI                      ; sifra je neispravna
 
-CHECK_SENSOR1
-	MOVE 	%B 001, R0
-	STORE 	R0, (GPIO_SENSOR_CFG)
-	LOAD 	R0, (GPIO_SENSOR_DATA)
-	AND 	R0, 1, R0	
-    JR_Z 	VRATI
+        MOVE        1, R0
+        STORE       R0, (SIFRA)                 ; oznaka da je unesena ispravna sifra
 
-RAMP_UP	
-	; pokreni motor
+IZADJI  POP         R1
+        POP         R0
+        RET
 
-WAIT_10s
-	; pokreni CT na INT0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-CHECK_SENSOR2
-	1 JR WAIT_10s
+RAMP_UP
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RAMP_DOWN
-	JR 	VRATI
 
-`ORG 1000  						
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-	PUSH R0			 	; spremanje konteksta
-	MOVE SR, R0
-	PUSH R0
-	PUSH R1
-	
-INT_CAUSE
-	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (prednost)
-	OR	R1, R1, R1		
-	JR_NZ	INT_BUTTON
-	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (sensor)
-	OR	R1, R1, R1		
-	JR_NZ	INT_SENSOR
-	AND 	SR, 00000010, R1	; ispitivanje je li button uzrokovao prekid (ramp)
-	OR	R1, R1, R1		
-	JR_NZ	INT_RAMP
+PREKIDNI                                ; koristi se kad korisnik pritisne tipku
+	PUSH        R0                      ; spremanje konteksta
+	MOVE        SR, R0
+	PUSH        R0
+	PUSH        R1
 
-INT_BUTTON
-	STORE 	R0, (GPIO_BUTTON_IACK)	; dojava prekida
-	LOADB 	R1, (GPIO_BUTTON_DATA) 	; load korisnikov gumb
-	AND 	R1, 000000FF, R1	; bitan samo zadnji bajt
+	STORE       R0, (GPIO_BUTTON_IACK)  ; dojava prihvata prekida
 
-PROVJERA_SREDNJE
-	CMP	R1, 00000004		; 04 je 1 za CENTER	
-	JR_NEQ	PROVJERA_BROJAC
-	MOVE 	1, R2
-	STORE 	R2, (ZASTAVICA)
-	
-PROVJERA_BROJAC	
-	LOAD 	R0, (BROJAC)		; load brojaca za zastitu 
-	
-SHIFT_REGISTER
-	ROTL R1, 8, R1
-	STORE R1, (SIFRA_USER)
-	OR R0, R0, R0
-	JR_Z PROVJERI_SIFRU
-	
-	ADD R1, 1, R1
-	STORE R1, (BROJAC)	
-	...			
+	LOAD        R0, (BROJAC)
+	ADD         R0, 1, R0               ; uvecaj brojac za 1 (jer je jos 1 tipka stisnuta)
+	STORE       R0, (BROJAC)            ; i spremi odmah nazad u memoriju
+    CMP         R0, 5                   ; ako je stisnuta srednja tipka, ona je 5. po redu pa izadji van
+    JR_EQ       IZADJI                  ; pritisnuta srednja tipka
 
-	STORE R0, (GPIO_BUTTON_END)
+    ; ako nije pritisnuta srednja tipka
+    LOAD        R0, (UNESENA_SIFRA)     ; ucitaj dosad stisnute tipke
+    ROTL        R0, 8, R0               ; napravi mjesta za jos jednu tipku
+    LOADB       R0, (GPIO_BUTTON_DATA)  ; ucitaj koja je tipka stisnuta (gore/dolje/lijevo/desno)
+    STORE       R0, (UNESENA_SIFRA)     ; spremi novounesenu sifru u memoriju
 
-INT_SENSOR
-
-INT_RAMP
-
-CLOSE
-	; zakreni motor
-	JP L1 ; skoci tamo da resetira stanje sifre, i zapocinje novu provjeru
-
-`ORG 2000  	; mjesto u memoriji gdje je ispravna sifra za otvaranje s kojom 
-		    ; provjeravamo ispravnost unosa korisnika
-	
-	SIFRA_CORRECT	DW 	10080201 
-			; left, up, down, right
-	SIFRA_USER	DW 	0
-	BROJA		DW 	0
-	ZASTAVICA    	DW    	0
+IZADJI
+    STORE       R0, (GPIO_BUTTON_IEND)  ; dojava zavrsetka prekida
+	POP R1
+	POP R0                              ; obnova konteksta
+	MOVE R0, SR
+	POP R0
+	RETI                                ; izlaz (sintaksa za maskirajuci)
 
 
 
