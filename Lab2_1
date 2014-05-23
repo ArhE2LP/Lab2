@@ -42,7 +42,7 @@ INIT
 MAIN
 	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
 	CMP         R2, 5
-	JR_NEQ      MAIN
+	JR_NE      MAIN
 
 	; sifra je unesena, zabrani daljnje prekide i idemo provjeriti sifru jel ispravna !
 
