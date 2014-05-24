@@ -37,10 +37,6 @@ INIT
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
     MOVE        %B 1101, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
     MOVE        %B 10010000, SR                 ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
-; provjeriti zadnji move
-; po meni umjesto neja treba
-;   OR		SR, 10010000, SR	
-; tako da se upali GIE i jedan od INTi... u ovom slucaju INT0
 
 MAIN
 	LOAD       R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
@@ -126,8 +122,8 @@ PREKIDNI                                ; koristi se kad korisnik pritisne tipku
 	STORE       R0, (GPIO_BUTTON_IACK)  ; dojava prihvata prekida
 
 	LOAD        R0, (BROJAC)
-	ADD         R0, 1, R0               ; uvecaj brojac za 1 (jer je jos 1 tipka stisnuta)
-	STORE       R0, (BROJAC)            ; i spremi odmah nazad u memoriju
+	ADD         R0, 1, R0           ; uvecaj brojac za 1 (jer je jos 1 tipka stisnuta)
+	STORE       R0, (BROJAC)        ; i spremi odmah nazad u memoriju
     CMP         R0, 5                   ; ako je stisnuta srednja tipka, ona je 5. po redu pa izadji van
     JR_EQ       IZADJI                  ; pritisnuta srednja tipka
 
