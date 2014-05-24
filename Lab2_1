@@ -93,7 +93,7 @@ PROVJERA_SIFRE
         LOAD        R0, (UNESENA_SIFRA)
         LOAD        R1, (ISPRAVNA_SIFRA)
         CMP         R0, R1
-        JR_NEQ      IZADJI                      ; sifra je neispravna
+        JR_NEQ    IZADJI                      ; sifra je neispravna
 
         MOVE        1, R0
         STORE       R0, (SIFRA)                 ; oznaka da je unesena ispravna sifra
