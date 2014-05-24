@@ -21,11 +21,11 @@ CT2_CR		`EQU	0FFFF0204
 CT2_IACK	`EQU	0FFFF0208
 CT2_IEND	`EQU	0FFFF020C
 */
-	`ORG		0
-    MOVE	    1000, SP                        ; inicijalizacija stoga
-    JP	        INIT	      	                ; skok na glavni zbog prekidnog vektora
+`ORG	0
+    MOVE   	1000, SP                        ; inicijalizacija stoga
+    JP		INIT	      	                ; skok na glavni zbog prekidnog vektora
 
-	`ORG		8		                        ; vektor
+`ORG	8		                        ; vektor
 	DW          PREKIDNI                        ; adresa prekidnog potprograma (tipka je stisnuta)								                                                                               p rovjeriti koji int uzrokuje prekid
 
 
@@ -35,13 +35,16 @@ INIT
     STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
     STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
-    MOVE        %B 1100, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
-    MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
-
+    MOVE        %B 1101, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
+    MOVE        %B 10010000, SR                 ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
+; provjeriti zadnji move
+; po meni umjesto neja treba
+;   OR		SR, 10010000, SR	
+; tako da se upali GIE i jedan od INTi... u ovom slucaju INT0
 
 MAIN
-	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
-	CMP         R2, 5
+	LOAD       R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
+	CMP        R2, 5
 	JR_NE      MAIN
 
 	; sifra je unesena, zabrani daljnje prekide i idemo provjeriti sifru jel ispravna !
