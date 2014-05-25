@@ -1,8 +1,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;; Adrese vanjskih jedinica;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; ove adrese mi smrde ...
-GPIO_SENSOR_1       `EQU	0FFFFC000   ; GPIO SNAPWIRE LOW INPUT
-GPIO_SENSOR_2       `EQU    0FFFFC004
+GPIO_SENSOR         `EQU	0FFFFC000   ; GPIO SNAPWIRE LOW INPUT
+GPIO_SENSOR_DATA
 
 GPIO_BUTTON_CFG     `EQU	0FFFFE000   ; GPIO BUTTON ADRESA
 GPIO_BUTTON_DATA    `EQU	0FFFFE004
@@ -63,9 +62,9 @@ MAIN
 
 	; unesena je ispravna sifra, idemo provjeriti jel automobil ispred !
 
-	LOAD        R0, (GPIO_SENSOR_1)
-	CMP         R0, 0                           ; senzor nije pronasao automobil, resetiraj sve
-	JR_EQ       INIT
+	LOAD        R0, (GPIO_SENSOR_DATA)
+	CMP         R0, 1                           ; senzor nije pronasao automobil, resetiraj sve
+	JR_NE       INIT
 
 	; unesena je ispravna sifra i automobil je ispred, dizi rampu !
 
@@ -73,13 +72,14 @@ MAIN
 
 	; rampa je podignuta, provjeri stanje senzora2
 CEKAJ
-	LOAD        R0, (GPIO_SENSOR_2)
-	CMP         R0, 0                           ; rampa jos uvijek treba stojati gore
-	CALL_EQ     WAIT                            ; idemo pricekati 10 sekundi
+	LOAD        R0, (GPIO_SENSOR_DATA)
+	CMP         R0, 2                           ; rampa jos uvijek treba stojati gore ?
+	JR_EQ       SPUSTAJ
+	CALL        WAIT                            ; idemo pricekati 10 sekundi
 	JR          CEKAJ                           ; sad opet idemo provjeriti dal mozemo spustiti ili cemo opet morati pricekat
 
 	; senzor2 je aktiviran, treba spustiti rampu
-
+SPUSTAJ
 	CALL        RAMP_DOWN
 
 	; rampa je spustena, ciklus je gotov
