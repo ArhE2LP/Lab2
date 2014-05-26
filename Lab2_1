@@ -43,17 +43,18 @@ INIT
     STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
     STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
-    MOVE	    %B 000, (GPIO_SENSOR)		    ; ulazni nacin, bez prekida
+    MOVE	    %B 011, (GPIO_SENSOR)		    ; ispitivanje bitova, bez prekida
     MOVE        %B 010, (GPIO_LED)              ; postavljanje bitova, bez prekida
     MOVE        %B 010, (GPIO_RAMPA)            ; postavljanje bitova, bez prekida
-    MOVE        %B 1100, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
+    LOAD        R0, (MASKA)
+    MOVE        R0, (GPIO_BUTTON_CFG)           ; ispitivanje bitova s maskirajucim prekidom
     MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
 
 
 MAIN
 	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
 	CMP         R2, 5                           ; dok se to provjerava u glavnom programu, dogadjaju se maskirajuci prekidi
-	JR_NE      MAIN                             ; i kad se dogodi 5 maskirajucih prekida, znaci da je stisnuto 5 tipki
+	JR_NE       MAIN                             ; i kad se dogodi 5 maskirajucih prekida, znaci da je stisnuto 5 tipki
 
 	; sifra je unesena, zabrani daljnje prekide i idemo provjeriti sifru jel ispravna !
 
@@ -236,6 +237,7 @@ BROJAC           DW  0                  ; koliko je dosad pritisnuto tipki, ako 
 UNESENA_SIFRA    DW  0                  ; zasad unesena sifra
 ISPRAVNA_SIFRA   DW  10080102           ; sifra za podizanje rampe : lijevo, gore, desno , dolje
 SREDNJA          DW  04
+MASKA            DW  %B 1111 1111 1111 1111 0001 1111
 
 ; srednja = 0000 0100 = 04
 ; lijevo = 0001 0000 = 10
