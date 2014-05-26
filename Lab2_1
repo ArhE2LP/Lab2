@@ -43,6 +43,7 @@ INIT
     STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
     STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
+    MOVE	%B 000, (GPIO_SENSOR)		; ulazni nacin, bez prekida
     MOVE        %B 010, (GPIO_LED)              ; postavljanje bitova, bez prekida
     MOVE        %B 010, (GPIO_RAMPA)            ; postavljanje bitova, bez prekida
     MOVE        %B 1100, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
