@@ -1,19 +1,17 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;; Adrese vanjskih jedinica;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-GPIO_SENSOR         `EQU	0FFFFC000   ; GPIO SNAPWIRE LOW INPUT
-GPIO_SENSOR_DATA    `EQU	0FFFFC004
+REED       		  `EQU	0FFFFC000
+REED_DATA   		 `EQU	0FFFFC004
 
-GPIO_LED            `EQU    0FFFFD000   ; lampica ce pomoci pri debuggiranju
-GPIO_LED_DATA       `EQU    0FFFFD004
+GPIO_LED          	`EQU    0FFFFD000
+GPIO_LED_DATA    	 `EQU    0FFFFD004
 
-GPIO_BUTTON_CFG     `EQU	0FFFFE000   ; GPIO BUTTON ADRESA
-GPIO_BUTTON_DATA    `EQU	0FFFFE004
-GPIO_BUTTON_IACK    `EQU	0FFFFE008
-GPIO_BUTTON_END     `EQU	0FFFFE00C
+BUTTON    		 `EQU	0FFFFE000  		 ; GPIO BUTTON ADRESA
+BUTTON_DATA    		`EQU	0FFFFE004
+BUTTON_IACK   		 `EQU	0FFFFE008
+BUTTON_END     		`EQU	0FFFFE00C
 
-GPIO_RAMPA          `EQU    0FFFFC100   ; GPIO SNAPWIRE HIGH OUTPUT
-GPIO_RAMPA_DATA     `EQU    0FFFFC104
-GPIO_RAMPA_STAT     `EQU    0FFFFC108
+RAMPA    	        `EQU    0FFFFC100   ; GPIO SNAPWIRE HIGH OUTPUT
+RAMPA_DATA     		`EQU    0FFFFC104
+RAMPA_STAT		`EQU	0FFFFC108
 
 RTC1_LR             `EQU    0FFFF0100   ; RTC1 ADRESS (CT)
 RTC1_CR             `EQU    0FFFF0104
@@ -34,8 +32,7 @@ RTC2_END            `EQU    0FFFF020C
     JP	        INIT	      	                ; skok na glavni zbog prekidnog vektora
 
 	`ORG		8		                        ; vektor
-	DW          PREKIDNI                        ; adresa prekidnog potprograma (tipka je stisnuta)								                                                                               p rovjeriti koji int uzrokuje prekid
-
+	DW          PREKIDNI                        ; adresa prekidnog potprograma (tipka je stisnuta)								                                                                
 
 
 INIT
@@ -43,46 +40,66 @@ INIT
     STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
     STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
-    MOVE	    %B 011, (GPIO_SENSOR)		    ; ispitivanje bitova, bez prekida
-    MOVE        %B 010, (GPIO_LED)              ; postavljanje bitova, bez prekida
-    MOVE        %B 010, (GPIO_RAMPA)            ; postavljanje bitova, bez prekida
-    LOAD        R0, (MASKA)
-    MOVE        R0, (GPIO_BUTTON_CFG)           ; ispitivanje bitova s maskirajucim prekidom
-    MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
+    
+    MOVE	    %B 011, R0			    ; ispitivanje bitova, bez prekida
+    STORE	    R0, (REED)		    ; 
+    
+    MOVE        %B 010, R0		              ; postavljanje bitova, bez prekida
+    STORE        R0, (GPIO_LED)           	   ; 
+    
+    MOVE        %B 010, R0		            ; postavljanje bitova, bez prekida
+    STORE        R0, (RAMPA)          		  ; 
+     
+    
+
 
 
 MAIN
-	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
+	; jel stigao auto?
+	LOAD        	R0, (REED_DATA)
+	AND		R0, %B 00000001, R0 
+	OR		R0, R0, R0
+	JR_Z       	MAIN
+
+	LOAD        R0, (MASKA)
+	STORE        R0, (BUTTON)           ; ispitivanje bitova s maskirajucim prekidom
+	MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
+    
+SIFRA_1	LOAD        R2, (BROJAC)                    ; cijelo vrijeme provjerava je li stisnuta srednja tipka
+	STORE       R2, (GPIO_LED_DATA)
 	CMP         R2, 5                           ; dok se to provjerava u glavnom programu, dogadjaju se maskirajuci prekidi
-	JR_NE       MAIN                             ; i kad se dogodi 5 maskirajucih prekida, znaci da je stisnuto 5 tipki
+	JR_NE       SIFRA_1                            ; i kad se dogodi 5 maskirajucih prekida, znaci da je stisnuto 5 tipki
 
 	; sifra je unesena, zabrani daljnje prekide i idemo provjeriti sifru jel ispravna !
 
 	MOVE        0, SR                           ; zabrana svih daljnjih prekida
+	
 
+	
 	CALL        PROVJERA_SIFRE
-
+	
+	
 	LOAD        R0, (SIFRA)                     ; ako sifra nije ispravna, resetiraj sve
 	CMP         R0, 0
 	JR_EQ       INIT
+	
+	
 
-	; unesena je ispravna sifra, idemo provjeriti jel automobil ispred !
-
-	LOAD        R0, (GPIO_SENSOR_DATA)
-	CMP         R0, 1                           ; senzor nije pronasao automobil, resetiraj sve
-	JR_NE       INIT
-
+	
 	; unesena je ispravna sifra i automobil je ispred, dizi rampu !
 
 	CALL        RAMP_UP
+	
 
-	; rampa je podignuta, provjeri stanje senzora2
+
+	; rampa je podignuta, provjeri stanje senzora1 i senzora2
 CEKAJ
-	LOAD        R0, (GPIO_SENSOR_DATA)
-	CMP         R0, 2                           ; rampa jos uvijek treba stojati gore ?
-	JR_EQ       SPUSTAJ
-	CALL        WAIT                            ; idemo pricekati 10 sekundi
-	JR          CEKAJ                           ; sad opet idemo provjeriti dal mozemo spustiti ili cemo opet morati pricekat
+	CALL        WAIT 
+	LOAD        R0, (REED_DATA)	
+	AND	    R0, %B 11, R0			; ocisti i provjeri
+	OR	    R0, R0, R0
+	JR_NZ         CEKAJ                           ; sad opet idemo provjeriti dal mozemo spustiti ili cemo opet morati pricekat
+	
 
 	; senzor2 je aktiviran, treba spustiti rampu
 SPUSTAJ
@@ -90,36 +107,22 @@ SPUSTAJ
 
 	; rampa je spustena, ciklus je gotov
 
-	HALT                                       ; ili treba dalje raditi (JR INIT) ?
+	JR	INIT                                       ; ili treba dalje raditi (JR INIT) ?
 
 	;;;;;; KRAJ GLAVNOG PROGRAMA ;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-WAIT                                            ; potprogram za cekanje 10 sekundi
-    PUSH    R0                                  ; spremanje konteksta
+WAIT                                        	    ; potprogram za cekanje 10 sekundi
+	PUSH   	R0                           
+	LOAD	R0, (CT_KONST)
 
-    MOVE    %D  9000, R0                        ; upis vremenskih konstanti
-    STORE   R0, (RTC1_LR)
-    MOVE    %D  15000, R0
-    STORE   R0, (RTC2_LR)
-
-    MOVE    %B  10, R0                          ; 10 = brojilo broji
-    STORE   R0, (RTC1_CR)                       ; .. i ne postavlja prekid
-    STORE   R0, (RTC2_CR)
-
-PETLJA
-    LOAD    R0, (RTC2_STAT)                     ; citanje stanja spremnosti
-    AND     R0, 1, R0                           ; ako je spremnost = 0, treba cekati dalje
-    JR_Z    PETLJA
-
-GOTOVO
-    STORE   R0, (RTC1_CLR)                      ; brisanje stanja spremnosti
-    STORE   R0, (RTC2_CLR)
-    STORE   R0, (RTC1_END)                      ; dojava kraja posluzivanja CTima
-    STORE   R0, (RTC2_END)
-    POP     R0                                  ; obnova konteksta
-    RET
+CEK
+	SUB	R0, 1, R0
+	JR_NZ	CEK
+	
+	POP	R0
+	RET
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 PROVJERA_SIFRE
@@ -129,12 +132,12 @@ PROVJERA_SIFRE
     LOAD        R0, (UNESENA_SIFRA)
     LOAD        R1, (ISPRAVNA_SIFRA)
     CMP         R0, R1
-    JR_NE      IZADJI                           ; sifra je neispravna
+    JR_NE      VAN                         	  ; sifra je neispravna
 
     MOVE        1, R0
     STORE       R0, (SIFRA)                     ; oznaka da je unesena ispravna sifra
 
-IZADJI
+VAN
     POP         R1
     POP         R0
     RET
@@ -145,18 +148,28 @@ RAMP_UP
     PUSH        R0
     PUSH        R1
     PUSH        R2
+    PUSH	R3
     MOVE        0, R0                           ; R0 oznacava koliko ciklusa je dosad obavljeno
     LOAD        R2, (CIKLUS)                    ; R2 oznacava potreban broj ciklusa da se rampa podigne
-    MOVE        %B 11111111, R1
+    LOAD	R1, (LABELA)
+    
 
-PETLJA
+
+PETLJA2
+   MOVE	%D 10000, R3
+CEKAJ_1
+    SUB		R3,1, R3
+    JR_NZ	CEKAJ_1
+    
     ROTL        R1, 1, R1
-    STORE       R1, (GPIO_RAMPA_DATA)
+    STORE       R1, (RAMPA_DATA)
     ADD         R0, 1, R0                       ; odradjen je (jos) jedan ciklus uvecaj brojac
     CMP         R0, R2                          ; ako nije odradjen dovoljan broj ciklusa
-    JR_NE       PETLJA                          ; odradi jos jedan, inace zavrsi
+    JR_NE       PETLJA2                         ; odradi jos jedan, inace zavrsi
+    
 
 ZAVRSI
+    POP		R3
     POP         R2
     POP         R1
     POP         R0
@@ -166,22 +179,28 @@ ZAVRSI
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RAMP_DOWN
-    RAMP_UP
     PUSH        R0
     PUSH        R1
     PUSH        R2
+    PUSH	R3
+    
     MOVE        0, R0                           ; R0 oznacava koliko ciklusa je dosad obavljeno
     LOAD        R2, (CIKLUS)                    ; R2 oznacava potreban broj ciklusa da se rampa podigne
-    MOVE        %B 11111111, R1
+    LOAD	R1, (LABELA)
 
-PETLJA
+PETLJA3
+	MOVE	%D 10000, R3
+CEKAJ_2
+    SUB		R3,1, R3
+    JR_NZ	CEKAJ_2
+    
     ROTR        R1, 1, R1
-    STORE       R1, (GPIO_RAMPA_DATA)
-    ADD         R0, 1, R0                       ; odradjen je (jos) jedan ciklus uvecaj brojac
+    STORE       R1, (RAMPA_DATA)
+    ADD         R0, 1, R0                       ; odradjen je (jos) jedan ciklus uvecaj brojac		
     CMP         R0, R2                          ; ako nije odradjen dovoljan broj ciklusa
-    JR_NE       PETLJA                          ; odradi jos jedan, inace zavrsi
+    JR_NE       PETLJA3                         ; odradi jos jedan, inace zavrsi
 
-ZAVRSI
+    POP		R3
     POP         R2
     POP         R1
     POP         R0
@@ -195,35 +214,46 @@ PREKIDNI                                ; koristi se kad korisnik pritisne tipku
 	PUSH        R0
 	PUSH        R1
 
-	STORE       R0, (GPIO_BUTTON_IACK)  ; dojava prihvata prekida
+	STORE       R0, (BUTTON_IACK)  ; dojava prihvata prekida
+	
 
 	LOAD        R0, (BROJAC)
 	ADD         R0, 1, R0               ; uvecaj brojac za 1 (jer je jos 1 tipka stisnuta)
 	STORE       R0, (BROJAC)            ; i spremi odmah nazad u memoriju
-    CMP         R0, 5                   ; pritisnuta je 5. tipka, idemo provjeriti jel ona srednja tipka
-    JR_EQ       PROVJERA                ;
+	CMP         R0, 5                   ; pritisnuta je 5. tipka, idemo provjeriti jel ona srednja tipka
+	JR_EQ       PROVJERA                ;
 
-    ; ako nije pritisnuta srednja tipka
-    LOAD        R0, (UNESENA_SIFRA)     ; ucitaj dosad stisnute tipke
-    ROTL        R0, 8, R0               ; napravi mjesta za jos jednu tipku
-    STORE       R0, (UNESENA_SIFRA)
-    LOADB       R1, (GPIO_BUTTON_DATA)  ; ucitaj koja je tipka stisnuta (gore/dolje/lijevo/desno)
-    STOREB      R1, (UNESENA_SIFRA)     ; spremi novounesenu sifru u memoriju
-    JR          IZADJI
+; ako nije pritisnuta srednja tipka
+		; LOAD        R0, (UNESENA_SIFRA)     ; ucitaj dosad stisnute tipke
+		; ROTL        R0, 8, R0               ; napravi mjesta za jos jednu tipku
+		; STORE       R0, (UNESENA_SIFRA)
+		; LOADB       R1, (BUTTON_DATA) 	    ; ucitaj koja je tipka stisnuta (gore/dolje/lijevo/desno)
+		; STOREB      R1, (UNESENA_SIFRA)     ; spremi novounesenu sifru u memoriju
+		; JR          IZADJI
 
+	LOAD 	R0, (UNESENA_SIFRA)
+	ROTL    R0, 8, R0
+	LOADB	R1, (BUTTON_DATA)
+	OR	R1, R0, R1
+	STORE	R1, (UNESENA_SIFRA)
+	JR	IZADJI
+	
 PROVJERA
-    LOAD        R0, (GPIO_BUTTON_DATA)  ; ucitaj unesenu tipku
-    LOAD        R1, (SREDNJA)           ; provjeri jel srednja
-    CMP         R0, R1                  ; ako je srednja, izadji
-    JR_EQ       IZADJI
+    LOAD         R0, (BUTTON_DATA)  		; ucitaj unesenu tipku
+    AND          R0, %B 0100, R0               ; ako je srednja, izadji
+    JR_NZ        IZADJI
 
     ;ako 5. pritisnuta tipka nije srednja tipka, obrisi dosad unesenu sifru i resetiraj brojac
     MOVE        0, R1
     STORE       R1, (BROJAC)
     STORE       R1, (UNESENA_SIFRA)
 
-IZADJI
-    STORE       R0, (GPIO_BUTTON_IEND)  ; dojava zavrsetka prekida
+	
+IZADJI	
+	MOVE        9000, R1
+PONOVI	SUB	    R1, 1, R1
+	JR_NZ       PONOVI
+	STORE       R0, (BUTTON_END)  	    ; dojava zavrsetka prekida
 	POP R1
 	POP R0                              ; obnova konteksta
 	MOVE R0, SR
@@ -235,9 +265,11 @@ CIKLUS           DW  1E6                ; oznacava broj potrebnih ciklusa pri di
 SIFRA            DW  0                  ; oznacava jel unesena ispravna sifra (0 = nije, 1 = je)
 BROJAC           DW  0                  ; koliko je dosad pritisnuto tipki, ako brojac = 5 => pritisnuta je srednja tipka
 UNESENA_SIFRA    DW  0                  ; zasad unesena sifra
-ISPRAVNA_SIFRA   DW  10080102           ; sifra za podizanje rampe : lijevo, gore, desno , dolje
-SREDNJA          DW  04
-MASKA            DW  %B 1111 1111 1111 1111 0001 1111
+ISPRAVNA_SIFRA   DW  %B 00010000000010000000000100000010       ; sifra za podizanje rampe : lijevo, gore, desno , dolje
+SREDNJA          DW  %B 0100
+MASKA            DW  %B 111111111111111100000111
+LABELA		 DW	11111111
+CT_KONST	 DW	5AFC54
 
 ; srednja = 0000 0100 = 04
 ; lijevo = 0001 0000 = 10
