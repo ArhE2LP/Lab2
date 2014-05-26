@@ -199,8 +199,8 @@ PREKIDNI                                ; koristi se kad korisnik pritisne tipku
 	LOAD        R0, (BROJAC)
 	ADD         R0, 1, R0               ; uvecaj brojac za 1 (jer je jos 1 tipka stisnuta)
 	STORE       R0, (BROJAC)            ; i spremi odmah nazad u memoriju
-    CMP         R0, 5                   ; ako je stisnuta srednja tipka, ona je 5. po redu pa izadji van jer ona nije dio sifre
-    JR_EQ       IZADJI                  ; pritisnuta srednja tipka
+    CMP         R0, 5                   ; pritisnuta je 5. tipka, idemo provjeriti jel ona srednja tipka
+    JR_EQ       PROVJERA                ;
 
     ; ako nije pritisnuta srednja tipka
     LOAD        R0, (UNESENA_SIFRA)     ; ucitaj dosad stisnute tipke
@@ -208,6 +208,18 @@ PREKIDNI                                ; koristi se kad korisnik pritisne tipku
     STORE       R0, (UNESENA_SIFRA)
     LOADB       R1, (GPIO_BUTTON_DATA)  ; ucitaj koja je tipka stisnuta (gore/dolje/lijevo/desno)
     STOREB      R1, (UNESENA_SIFRA)     ; spremi novounesenu sifru u memoriju
+    JR          IZADJI
+
+PROVJERA
+    LOAD        R0, (GPIO_BUTTON_DATA)  ; ucitaj unesenu tipku
+    LOAD        R1, (SREDNJA)           ; provjeri jel srednja
+    CMP         R0, R1                  ; ako je srednja, izadji
+    JR_EQ       IZADJI
+
+    ;ako 5. pritisnuta tipka nije srednja tipka, obrisi dosad unesenu sifru i resetiraj brojac
+    MOVE        0, R1
+    STORE       R1, (BROJAC)
+    STORE       R1, (UNESENA_SIFRA)
 
 IZADJI
     STORE       R0, (GPIO_BUTTON_IEND)  ; dojava zavrsetka prekida
@@ -223,7 +235,9 @@ SIFRA            DW  0                  ; oznacava jel unesena ispravna sifra (0
 BROJAC           DW  0                  ; koliko je dosad pritisnuto tipki, ako brojac = 5 => pritisnuta je srednja tipka
 UNESENA_SIFRA    DW  0                  ; zasad unesena sifra
 ISPRAVNA_SIFRA   DW  10080102           ; sifra za podizanje rampe : lijevo, gore, desno , dolje
+SREDNJA          DW  04
 
+; srednja = 0000 0100 = 04
 ; lijevo = 0001 0000 = 10
 ; desno  = 0000 0001 = 01
 ; gore   = 0000 1000 = 08
