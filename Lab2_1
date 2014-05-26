@@ -1,7 +1,10 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;; Adrese vanjskih jedinica;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 GPIO_SENSOR         `EQU	0FFFFC000   ; GPIO SNAPWIRE LOW INPUT
-GPIO_SENSOR_DATA
+GPIO_SENSOR_DATA    `EQU	0FFFFC004
+
+GPIO_LED            `EQU    0FFFFD000   ; lampica ce pomoci pri debuggiranju
+GPIO_LED_DATA       `EQU    0FFFFD004
 
 GPIO_BUTTON_CFG     `EQU	0FFFFE000   ; GPIO BUTTON ADRESA
 GPIO_BUTTON_DATA    `EQU	0FFFFE004
@@ -40,7 +43,8 @@ INIT
     STORE       R0, (SIFRA)                     ; 1 <=> ( unesena sifra == ispravna sifra ) , inace je 0
     STORE       R0, (BROJAC)                    ; koliko je tipki dosad stisnuto
     STORE       R0, (UNESENA_SIFRA)             ; sifra koju je korisnik unio
-    MOVE        %B 000, (GPIO_RAMPA)            ; izlazni nacin, bez prekida
+    MOVE        %B 010, (GPIO_LED)              ; postavljanje bitova, bez prekida
+    MOVE        %B 010, (GPIO_RAMPA)            ; postavljanje bitova, bez prekida
     MOVE        %B 1100, (GPIO_BUTTON_CFG)      ; ulazni nacin s maskirajucim prekidom
     MOVE        %B 10000, SR                    ; dozvoli maskirajuce prekide (tipke ce postavljati te prekide)
 
@@ -141,16 +145,11 @@ RAMP_UP
     PUSH        R2
     MOVE        0, R0                           ; R0 oznacava koliko ciklusa je dosad obavljeno
     LOAD        R2, (CIKLUS)                    ; R2 oznacava potreban broj ciklusa da se rampa podigne
+    MOVE        %B 11111111, R1
 
 PETLJA
-CEKAJ_RAMPU
-    LOAD        R1, (GPIO_RAMPA_STAT)           ; rampa je zapravo uvjetna vanjska jedinica
-    CMP         R1, 0
-    JR_EQ       CEKAJ_RAMPU                     ; ako nije spremna, pricekaj, ako je spremna, posalji podatak
-
-    STORE       R1, (GPIO_RAMPA_STAT)           ; obrisi stanje spremnosti
-    STORE       R1, (GPIO_RAMPA_DATA)           ; posalji podatak za podizanje (1)
-
+    ROTL        R1, 1, R1
+    STORE       R1, (GPIO_RAMPA_DATA)
     ADD         R0, 1, R0                       ; odradjen je (jos) jedan ciklus uvecaj brojac
     CMP         R0, R2                          ; ako nije odradjen dovoljan broj ciklusa
     JR_NE       PETLJA                          ; odradi jos jedan, inace zavrsi
@@ -165,22 +164,17 @@ ZAVRSI
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 RAMP_DOWN
+    RAMP_UP
     PUSH        R0
     PUSH        R1
     PUSH        R2
     MOVE        0, R0                           ; R0 oznacava koliko ciklusa je dosad obavljeno
-    LOAD        R2, (CIKLUS)                    ; R2 oznacava potreban broj ciklusa da se rampa spusti
+    LOAD        R2, (CIKLUS)                    ; R2 oznacava potreban broj ciklusa da se rampa podigne
+    MOVE        %B 11111111, R1
 
 PETLJA
-CEKAJ_RAMPU
-    LOAD        R1, (GPIO_RAMPA_STAT)           ; rampa je zapravo uvjetna vanjska jedinica
-    CMP         R1, 0
-    JR_EQ       CEKAJ_RAMPU                     ; ako nije spremna, pricekaj, ako je spremna, posalji podatak
-
-    STORE       R1, (GPIO_RAMPA_STAT)           ; obrisi stanje spremnosti
-    MOVE        2, R1
-    STORE       R1, (GPIO_RAMPA_DATA)           ; posalji podatak za spustanje (2)
-
+    ROTR        R1, 1, R1
+    STORE       R1, (GPIO_RAMPA_DATA)
     ADD         R0, 1, R0                       ; odradjen je (jos) jedan ciklus uvecaj brojac
     CMP         R0, R2                          ; ako nije odradjen dovoljan broj ciklusa
     JR_NE       PETLJA                          ; odradi jos jedan, inace zavrsi
@@ -222,8 +216,7 @@ IZADJI
 	RETI                                ; izlaz (sintaksa za maskirajuci)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-CIKLUS           DW  100                ; oznacava broj potrebnih ciklusa pri dizanju/spustanju rampe
-                                        ;(krenit cemo od 100 pa cemo testirati jel treba vise/manje)
+CIKLUS           DW  1E6                ; oznacava broj potrebnih ciklusa pri dizanju/spustanju rampe
 SIFRA            DW  0                  ; oznacava jel unesena ispravna sifra (0 = nije, 1 = je)
 BROJAC           DW  0                  ; koliko je dosad pritisnuto tipki, ako brojac = 5 => pritisnuta je srednja tipka
 UNESENA_SIFRA    DW  0                  ; zasad unesena sifra
